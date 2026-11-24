@@ -59,3 +59,29 @@ export async function loadOverview(): Promise<OverviewResult> {
   if (!response.ok) throw new Error('运营概览读取失败')
   return await response.json()
 }
+
+export type RollupOperation =
+  | 'late-sample'
+  | 'review-late'
+  | 'handoff'
+  | 'replay-handoff'
+  | 'next-round'
+  | 'confirm'
+  | 'summary'
+
+/** 窗口归并的领域操作：迟报更正、审核、交接、复盘与下一轮。 */
+export async function runRollupOperation(
+  id: number,
+  operation: RollupOperation,
+  payload: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+  const response = await request(`/api/rollup_window/${id}/operations/${operation}`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  const data = await response.json()
+  if (!response.ok) {
+    throw new Error(typeof data?.detail === 'string' ? data.detail : '归并操作失败')
+  }
+  return data
+}

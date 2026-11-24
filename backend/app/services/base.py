@@ -107,15 +107,38 @@ class BaseModuleService:
         _ensure_dir(p)
         return p
 
-    def _write_jsonl(self, filepath: Path, records: list[dict[str, Any]]) -> int:
-        """将记录列表按行写入 JSONL 文件，返回实际写入条数。"""
+    def _write_jsonl(self, filepath: Path, records: list[dict[str, Any]],
+                     *, append: bool = True) -> int:
+        """将记录列表按行写入 JSONL 文件，返回实际写入条数。
+
+        append=False 时整文件覆盖，用于归并轮次、降采样结果等需要幂等重算的产物，
+        避免同一次重算把同一窗口重复写进文件、被下游统计两次。
+        """
         _ensure_dir(filepath.parent)
         written = 0
-        with open(filepath, "a", encoding="utf-8") as f:
+        mode = "a" if append else "w"
+        with open(filepath, mode, encoding="utf-8") as f:
             for rec in records:
                 f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
                 written += 1
         return written
+
+    def _write_json_file(self, filepath: Path, payload: Any) -> Path:
+        """写入单个 JSON 文件（状态、交接快照元数据等）。"""
+        _ensure_dir(filepath.parent)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2, default=str)
+        return filepath
+
+    def _read_json_file(self, filepath: Path) -> Any:
+        """读取单个 JSON 文件，不存在或损坏时返回 None。"""
+        if not filepath.exists():
+            return None
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None
 
     def _read_jsonl(self, filepath: Path) -> list[dict[str, Any]]:
         """从 JSONL 文件逐行读取记录列表，用于跨模块共享数据产物。"""
